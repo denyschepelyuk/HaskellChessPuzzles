@@ -1,0 +1,27 @@
+cabal-version:      2.4
+name:               chess-puzzles
+version:            0.1.0.0
+synopsis:           Chess puzzles in Haskell (typed board + placements DSL)
+description:        A minimal but strongly-typed base to build a "mate in N" solver.
+author:             You
+maintainer:         you@example.com
+license:            BSD-3-Clause
+build-type:         Simple
+
+library
+  exposed-modules:    Chess.Types, Chess.Board, Chess.Setup
+  hs-source-dirs:     src
+  default-language:   Haskell2010
+  build-depends:      base >= 4.14 && < 5,
+                      containers,
+                      vector
+
+executable chess-puzzles
+  main-is:            Main.hs
+  hs-source-dirs:     src
+  default-language:   Haskell2010
+  ghc-options:        -Wall -O2
+  build-depends:      base >= 4.14 && < 5,
+                      containers,
+                      vector,
+                      chess-puzzles
