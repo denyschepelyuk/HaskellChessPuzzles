@@ -5,9 +5,9 @@ module Chess.Setup
 
 import Chess.Types
 import Chess.Board
+import Chess.Gen (kqkBox)
 
--- White: Kg1, Qh5, Rf1, Pawns g2 h2
--- Black: Kg8, Pawns f7 g7 h7
+-- Keep an explicit puzzle list for reference
 examplePuzzle :: [(Square, Piece)]
 examplePuzzle =
   [ at 'g' 1 .= w King
@@ -20,8 +20,8 @@ examplePuzzle =
   , at 'g' 7 .= b Pawn
   , at 'h' 7 .= b Pawn
   ]
-  where
-    (.=) = (,)
+  where (.=) = (,)
 
+-- Use a generated board for the running demo
 exampleBoard :: Board
-exampleBoard = place examplePuzzle
+exampleBoard = kqkBox

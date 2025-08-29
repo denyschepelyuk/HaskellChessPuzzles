@@ -3,6 +3,7 @@ module Chess.Board
   , empty
   , place
   , set
+  , clear
   , pieceAt
   , prettyBoard
   ) where
@@ -14,7 +15,8 @@ import qualified Data.Vector as V
 
 -- Board as a 64-slot vector (a1=0 .. h8=63)
 newtype Board = Board { unBoard :: Vector (Maybe Piece) }
-  deriving (Eq)
+  deriving (Eq, Show)
+
 
 -- Start from an empty board
 empty :: Board
@@ -23,6 +25,10 @@ empty = Board (V.replicate 64 Nothing)
 -- Place a single piece
 set :: Board -> Square -> Piece -> Board
 set (Board v) (Square i) p = Board (v V.// [(i, Just p)])
+
+-- Clear a square
+clear :: Board -> Square -> Board
+clear (Board v) (Square i) = Board (v V.// [(i, Nothing)])
 
 -- Bulk placement
 place :: [(Square, Piece)] -> Board
@@ -40,7 +46,7 @@ prettyBoard (Board v) = unlines $ header : rows ++ [footer]
     footer = header
     rows   = [ row r | r <- [7,6..0] ]
     row r  = show (r+1) ++ " | " ++ cells r ++ " | " ++ show (r+1)
-    cells r = concat [ cell (r*8 + f) ++ if f < 7 then " " else "" | f <- [0..7] ]
+    cells r = concat [ cell (r*8 + f) ++ (if f < 7 then " " else "") | f <- [0..7] ]
     cell i = case v ! i of
       Nothing -> ".  "
       Just p  -> [renderPieceChar p] ++ "  "

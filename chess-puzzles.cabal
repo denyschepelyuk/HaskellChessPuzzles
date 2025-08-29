@@ -9,7 +9,8 @@ license:            BSD-3-Clause
 build-type:         Simple
 
 library
-  exposed-modules:    Chess.Types, Chess.Board, Chess.Setup
+  exposed-modules:    Chess.Types, Chess.Board, Chess.Setup,
+                      Chess.Game, Chess.Move, Chess.Gen
   hs-source-dirs:     src
   default-language:   Haskell2010
   build-depends:      base >= 4.14 && < 5,
