@@ -3,36 +3,54 @@ module Main (main) where
 import System.Environment (getArgs)
 import System.IO (hFlush, stdout)
 
-import Chess.Board   (prettyBoard)
-import Chess.Game    (exampleGame, Game(..))
-import Chess.Move    (uciToMove)
-import Chess.Apply   (applyMoveRules)
-import Chess.MoveGen (perft)
+import Chess.Board    (prettyBoard)
+import Chess.Game     (exampleGame, Game(..))
+import Chess.Move     (uciToMove)
+import Chess.Apply    (applyMoveRules)
+import Chess.MoveGen  (perft)
 import Chess.Legality (inCheck, isCheckmate, isStalemate)
+import Chess.GenCLI   (genMateN)
 
 banner :: String
 banner = unlines
-  [ "=== Chess Puzzles (Haskell) — Demo ==="
-  , "Below is the current demo position."
-  , "- White pieces are uppercase (K Q R B N P); black are lowercase."
-  , "- '.' marks an empty square. Ranks 8→1, files a→h."
+  [ "=== Chess Puzzles (Haskell) — CLI ==="
   , ""
-  , "Run interactive simulation:"
+  , "Usage:"
   , "  cabal run chess-puzzles -- simulate"
+  , "  cabal run chess-puzzles -- perft <depth>"
+  , "  cabal run chess-puzzles -- gen mate <N> [COUNT]"
   , ""
-  , "Perft (pseudo-legal node count):"
-  , "  cabal run chess-puzzles -- perft 2"
+  , "Notes:"
+  , "  - UCI moves: e2e4, g7g8Q (promotion)."
+  , "  - 'simulate' shows Check/Checkmate/Stalemate after each move."
+  , "  - 'gen mate N [COUNT]' scans simple KQK templates and prints puzzles"
+  , "    where the side to move (White) can mate in exactly N moves, with a"
+  , "    unique first move."
   ]
 
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    ["simulate"]       -> loop exampleGame True
-    ["perft", dStr]    -> case reads dStr of
-                            [(d,"")] -> putStrLn ("nodes=" ++ show (perft d exampleGame))
-                            _        -> putStrLn "Usage: perft <depth>"
-    _                  -> do
+    ["simulate"] ->
+      loop exampleGame True
+
+    ["perft", dStr] ->
+      case reads dStr of
+        [(d, "")] -> putStrLn ("nodes=" ++ show (perft d exampleGame))
+        _         -> putStrLn "Usage: perft <depth>"
+
+    ["gen", "mate", nStr] ->
+      case reads nStr of
+        [(n, "")] -> genMateN n 5
+        _         -> putStrLn "Usage: gen mate <N> [COUNT]"
+
+    ["gen", "mate", nStr, cntStr] ->
+      case (reads nStr, reads cntStr) of
+        ([(n, "")], [(k, "")]) -> genMateN n k
+        _                      -> putStrLn "Usage: gen mate <N> [COUNT]"
+
+    _ -> do
       putStrLn banner
       putStrLn (prettyBoard (board exampleGame))
       putStrLn "White to move in the demo position."
@@ -40,7 +58,9 @@ main = do
 loop :: Game -> Bool -> IO ()
 loop g first = do
   putStrLn (prettyBoard (board g))
-  if first then putStrLn "Type moves like e2e4, g7g8Q; 'q' to quit." else pure ()
+  if first
+    then putStrLn "Enter UCI moves (e2e4, e7e8Q). Type 'q' to quit."
+    else pure ()
   putStr (show (toMove g) ++ " to move — enter UCI: ")
   hFlush stdout
   ln <- getLine
@@ -57,7 +77,7 @@ loop g first = do
 
 status :: Game -> String
 status g
-  | isCheckmate g = "Checkmate."
-  | isStalemate g = "Stalemate."
-  | inCheck g (toMove g) = "Check!"
-  | otherwise = ""
+  | isCheckmate g           = "Checkmate."
+  | isStalemate g           = "Stalemate."
+  | inCheck g (toMove g)    = "Check!"
+  | otherwise               = ""
