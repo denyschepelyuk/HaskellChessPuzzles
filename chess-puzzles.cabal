@@ -17,6 +17,7 @@ library
                     , Chess.Apply
                     , Chess.Gen
                     , Chess.MoveGen
+                    , Chess.Legality
   hs-source-dirs:     src
   default-language:   Haskell2010
   build-depends:      base >= 4.14 && < 5
@@ -25,13 +26,12 @@ library
 
 executable chess-puzzles
   main-is:            Main.hs
-  hs-source-dirs:     src
+  hs-source-dirs:     app
   default-language:   Haskell2010
   ghc-options:        -Wall -O2
   build-depends:      base >= 4.14 && < 5
-                    , containers
-                    , vector
                     , chess-puzzles
+
 
 test-suite movegen-spec
   type:               exitcode-stdio-1.0
