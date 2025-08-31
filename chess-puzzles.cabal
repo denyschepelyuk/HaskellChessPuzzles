@@ -25,6 +25,7 @@ library
   build-depends:      base >= 4.14 && < 5
                     , containers
                     , vector
+                    , random     >= 1.2 && < 2
 
 executable chess-puzzles
   main-is:            Main.hs
