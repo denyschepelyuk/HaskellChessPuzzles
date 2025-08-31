@@ -1,5 +1,6 @@
 module Chess.GenCLI
   ( genMateN
+  , probeMate1
   ) where
 
 import Chess.Types
@@ -8,68 +9,69 @@ import Chess.Game
 import Chess.Move       (uciOfMove)
 import Chess.Apply      (applyMoveRules)
 import Chess.Legality   (legalMoves, isCheckmate, isStalemate)
-import Chess.Search
-  ( matesInExactlyMoves
-  , matesInAtMostMoves
-  )
-import Data.List (nub)
+import Chess.Search     (matesInExactlyMoves, matesInAtMostMoves)
+import Data.List        (nub)
 
 infix 1 .=
 (.=) :: Square -> Piece -> (Square, Piece)
 (.=) = (,)
 
--- | Generate KQK mate-in-N puzzles. Scans BK on board edges (corners + files a/h + ranks 1/8)
---   and WK/WQ anywhere. Prints puzzles where White to move mates in EXACTLY N with UNIQUE first move.
-genMateN :: Int -> Int -> IO ()
-genMateN n want = do
-  putStrLn $ "Generating mate-in-" ++ show n ++ " KQK puzzles (target " ++ show want ++ ")..."
+-- | Chebyshev distance (king metric).
+cheb :: Square -> Square -> Int
+cheb a b = max (abs (fileOf a - fileOf b)) (abs (rankOf a - rankOf b))
+
+-- | Generate KQK mate-in-N puzzles with a *focused* scan:
+--   - black king ANY square
+--   - white king at Chebyshev distance exactly 2 from BK (not adjacent)
+--   - white queen within Chebyshev distance 1..3 from BK
+--   This keeps candidates realistic and fast.
+--
+--   allowAny = True  → accept puzzles even if multiple winning first moves exist
+--   allowAny = False → require a unique winning first move
+genMateN :: Int -> Int -> Bool -> IO ()
+genMateN n want allowAny = do
+  putStrLn $ "Generating mate-in-" ++ show n ++ " (focused KQK), target " ++ show want ++ "…"
   go 0 0 candidates
   where
-    allSquaresFR = [ (f,r) | f <- ['a'..'h'], r <- [1..8] ]
-    wkSquares = [ at f r | (f,r) <- allSquaresFR ]
-    wqSquares = wkSquares
+    allSquares = [ at f r | f <- ['a'..'h'], r <- [1..8] ]
+    bkSquares  = allSquares
 
-    edges =
-      [ (f,r) | f <- ['a','h'], r <- [1..8] ] ++
-      [ (f,r) | r <- [1,8],     f <- ['b'..'g'] ]
-    bkSquares = [ at f r | (f,r) <- edges ]
-
+    -- for each BK, choose WK at distance exactly 2 (and not adjacent),
+    -- and WQ within distance 1..3 from BK
     candidates =
       [ startGame (place [wk .= w King, wq .= w Queen, bk .= b King]) White
-      | wk <- wkSquares, wq <- wqSquares, bk <- bkSquares
-      , distinct [wk,wq,bk]
-      , not (kingsAdjacent wk bk)
+      | bk <- bkSquares
+      , wk <- [ s | s <- allSquares, s /= bk, cheb s bk == 2 ]
+      , wq <- [ s | s <- allSquares, s /= bk, s /= wk, let d = cheb s bk, d >= 1, d <= 3 ]
       , not (isTerminalStart (startGame (place [wk .= w King, wq .= w Queen, bk .= b King]) White))
       ]
 
     isTerminalStart g = isCheckmate g || isStalemate g
 
-    go found seen [] = putStrLn $ "Done. Scanned " ++ show seen ++ " candidates. Found " ++ show found ++ "."
+    go found seen [] =
+      putStrLn $ "Done. Scanned " ++ show seen ++ " candidates. Found " ++ show found ++ "."
     go found seen (g:gs)
       | found >= want = putStrLn $ "Done. Reached target " ++ show found ++ "."
       | otherwise =
           case matesInExactlyMoves n g of
-            Nothing -> next
+            Nothing -> tick >> go found (seen+1) gs
             Just pv ->
-              if uniqueFirst g n
+              if allowAny || uniqueFirst g n
                 then do
                   putStrLn "----------------------------------------"
                   putStrLn (prettyBoard (board g))
                   putStrLn ("White to move. Mate in " ++ show n ++ ".")
                   putStrLn ("PV (UCI): " ++ unwords (map uciOfMove pv))
-                  putStrLn "First move is UNIQUE"
+                  tick
                   go (found+1) (seen+1) gs
-                else next
+                else tick >> go found (seen+1) gs
       where
-        next = do
-          whenTick seen
-          go found (seen+1) gs
+        tick = whenTick seen
 
     whenTick k =
-      -- lightweight progress every ~10k candidates
-      if k `mod` 10000 == 0 then putStrLn ("… scanned " ++ show k ++ " candidates") else pure ()
+      if k `mod` 5000 == 0 then putStrLn ("… scanned " ++ show k ++ " candidates") else pure ()
 
--- Is the first winning move unique among legal first moves?
+-- Is the first winning move unique among all legal first moves?
 uniqueFirst :: Game -> Int -> Bool
 uniqueFirst g n =
   length winningFirsts == 1
@@ -81,22 +83,28 @@ uniqueFirst g n =
       , let g' = apply' g m
       , Just _ <- [ matesInAtMostMoves n g' ]
       ]
-
     apply' st m = case applyMoveRules st m of
                     Right g' -> g'
-                    _        -> st   -- legalMoves ensures apply succeeds; safe fallback
+                    _        -> st   -- legalMoves should guarantee success
 
--- Helpers
-distinct :: Eq a => [a] -> Bool
-distinct xs = length xs == length (nub xs)
+-- === Sanity probe: a known KQK mate-in-1 pattern ===
+-- BK a8, WK c7, WQ c6 → 1.Qb7# is mate
+probeMate1 :: IO ()
+probeMate1 = do
+  let g0 = startGame (place
+           [ at 'a' 8 .= b King
+           , at 'c' 7 .= w King
+           , at 'c' 6 .= w Queen
+           ]) White
+  putStrLn "Known KQK mate-in-1 probe:"
+  putStrLn (prettyBoard (board g0))
+  case matesInExactlyMoves 1 g0 of
+    Nothing -> putStrLn "Solver did NOT find mate-in-1 here (unexpected)."
+    Just pv -> do
+      putStrLn ("Solver PV: " ++ unwords (map uciOfMove pv))
+      putStrLn "Expected first move among PV: Qc6b7#"
 
-kingsAdjacent :: Square -> Square -> Bool
-kingsAdjacent a b =
-  a /= b &&
-  abs (fileOf a - fileOf b) <= 1 &&
-  abs (rankOf a - rankOf b) <= 1
-
--- minimal when without importing Control.Monad
+-- tiny 'when' without importing Control.Monad
 when :: Bool -> IO () -> IO ()
 when True  act = act
 when False _   = pure ()

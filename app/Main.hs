@@ -9,7 +9,7 @@ import Chess.Move     (uciToMove)
 import Chess.Apply    (applyMoveRules)
 import Chess.MoveGen  (perft)
 import Chess.Legality (inCheck, isCheckmate, isStalemate)
-import Chess.GenCLI   (genMateN)
+import Chess.GenCLI   (genMateN, probeMate1)
 
 banner :: String
 banner = unlines
@@ -18,14 +18,15 @@ banner = unlines
   , "Usage:"
   , "  cabal run chess-puzzles -- simulate"
   , "  cabal run chess-puzzles -- perft <depth>"
-  , "  cabal run chess-puzzles -- gen mate <N> [COUNT]"
+  , "  cabal run chess-puzzles -- gen mate <N> [COUNT] [--any]"
+  , "  cabal run chess-puzzles -- probe mate1"
   , ""
   , "Notes:"
   , "  - UCI moves: e2e4, g7g8Q (promotion)."
   , "  - 'simulate' shows Check/Checkmate/Stalemate after each move."
-  , "  - 'gen mate N [COUNT]' scans simple KQK templates and prints puzzles"
-  , "    where the side to move (White) can mate in exactly N moves, with a"
-  , "    unique first move."
+  , "  - 'gen mate N COUNT [--any]' scans *focused* KQK patterns near the BK."
+  , "    '--any' disables the unique-first check."
+  , "  - 'probe mate1' runs a known KQK mate-in-1 sanity check."
   ]
 
 main :: IO ()
@@ -42,13 +43,21 @@ main = do
 
     ["gen", "mate", nStr] ->
       case reads nStr of
-        [(n, "")] -> genMateN n 5
-        _         -> putStrLn "Usage: gen mate <N> [COUNT]"
+        [(n, "")] -> genMateN n 5 False
+        _         -> putStrLn "Usage: gen mate <N> [COUNT] [--any]"
 
     ["gen", "mate", nStr, cntStr] ->
       case (reads nStr, reads cntStr) of
-        ([(n, "")], [(k, "")]) -> genMateN n k
-        _                      -> putStrLn "Usage: gen mate <N> [COUNT]"
+        ([(n, "")], [(k, "")]) -> genMateN n k False
+        _                      -> putStrLn "Usage: gen mate <N> [COUNT] [--any]"
+
+    ["gen", "mate", nStr, cntStr, flag] | flag == "--any" ->
+      case (reads nStr, reads cntStr) of
+        ([(n, "")], [(k, "")]) -> genMateN n k True
+        _                      -> putStrLn "Usage: gen mate <N> [COUNT] [--any]"
+
+    ["probe", "mate1"] ->
+      probeMate1
 
     _ -> do
       putStrLn banner
@@ -77,7 +86,7 @@ loop g first = do
 
 status :: Game -> String
 status g
-  | isCheckmate g           = "Checkmate."
-  | isStalemate g           = "Stalemate."
-  | inCheck g (toMove g)    = "Check!"
-  | otherwise               = ""
+  | isCheckmate g        = "Checkmate."
+  | isStalemate g        = "Stalemate."
+  | inCheck g (toMove g) = "Check!"
+  | otherwise            = ""
