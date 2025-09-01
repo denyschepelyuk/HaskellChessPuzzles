@@ -101,4 +101,4 @@ perft <depth>
 gen mate <N> [COUNT] [--any]
 gen random <PIECES> <N> [COUNT] [--any] [--tries T]
 probe mate1
-```eibccbvgblhcdguvbhgkerknhjcrulflutgjcdeenbcb
+```
